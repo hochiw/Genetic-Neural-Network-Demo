@@ -6,7 +6,7 @@ from Layer import Layer
 # The main genetic algorithm class
 class Genetic:
     # Initialize data
-    def __init__(self, population, generations, selection_percentage, mutation_rate,  inp, output):
+    def __init__(self, population, generations, selection_percentage, mutation_rate, connection_chance,maxL,maxN,inp, output):
         # Number of inputs and outputs
         self.inp = inp
         self.output = output
@@ -23,6 +23,12 @@ class Genetic:
         # How often does a mutation occur
         self.mutation_rate = mutation_rate
 
+        self.connection_chance = connection_chance
+
+        self.maxL = maxL
+
+        self.maxN = maxN
+
         # Agent with the highest fitness are stored here
         self.best_fit = None
 
@@ -31,7 +37,7 @@ class Genetic:
 
     def init_agents(self):
         # Create agents according to the given data
-        return [Agent(self.inp, self.output) for _ in range(self.population)]
+        return [Agent(self.inp, self.output, self.connection_chance,self.maxL,self.maxN) for _ in range(self.population)]
 
     # Function that computes the fitness of all the agents
     def fitness(self, agents):
@@ -41,9 +47,12 @@ class Genetic:
 
             # Return 1 if the agent has it correctly or else return the error
             if error != 0:
-                agent.fitness = 1/error
+                if error > 1:
+                    agent.fitness = 1/error
+                else:
+                    agent.fitness = error
             else:
-                agent.fitness += 1
+                agent.fitness = 1
 
         return agents
 
@@ -52,11 +61,12 @@ class Genetic:
         # Sort the agents by their fitness value
         agents = sorted(self.agents, key=lambda x: x.fitness, reverse=True)
 
-        # Print out the top 10 agents
-        print('\n'.join(map(str,agents[:10])))
-
         # Select agents according to the given percentage
         agents = self.agents[:int(self.selection_percentage * len(self.agents))]
+
+        # Print out the top 10 agents
+        print('\n'.join(map(str,sorted(agents[:10],key=lambda x:x.fitness,reverse=True))))
+        print("Average fitness: {0}".format(sum(i.fitness for i in agents)/len(agents)))
 
         return agents
 
@@ -72,65 +82,57 @@ class Genetic:
             parent_2 = random.choice(agents)
 
             # Create two empty agents
-            child_1 = Agent(self.inp, self.output, True)
-            child_2 = Agent(self.inp, self.output, True)
+            child_1 = Agent(self.inp, self.output, self.connection_chance,self.maxL, self.maxN, True)
+            child_2 = Agent(self.inp, self.output, self.connection_chance,self.maxL, self.maxN, True)
 
-            # Randomize a range for layer extraction
-            split_1 = random.randint(0, len(parent_1.layers) - 1)
+            split_1 = random.randint(1,len(parent_1.layers))
             split_2 = random.randint(0,len(parent_2.layers) - 1)
 
-            # Extract the first portion of parent 1 and second portion of parent 2
-            p1 = parent_1.layers[0:split_1]
-            p2 = parent_2.layers[split_2:len(parent_2.layers)]
+            child_1.layers = parent_1.layers[0:split_1] + parent_2.layers[split_2: len(parent_2.layers)]
 
-            # Check if the portion is empty
-            if len(p1) == 0 or len(p2) == 0:
-                continue
+            split_1 = random.randint(0, len(parent_1.layers) - 1)
+            split_2 = random.randint(1,len(parent_2.layers))
 
-            # If the first portion have more then one value then select the last one
-            # or else select the first one (which is the only one)
-            first = p1[0]
-            if len(p1) > 1:
-                first = p1[-1]
+            child_2.layers = parent_2.layers[0:split_2] + parent_1.layers[split_1:len(parent_1.layers)]
 
-            # Select the first value of portion 2
-            second = p2[0]
+            # Attempt to reconnect the links
+            for layer in child_1.layers:
+                for node in layer.nodes:
+                    for layer_i in parent_1.layers:
+                        for layer_f in parent_2.layers:
+                            if node in layer_i.connections.keys():
+                                for item in layer_i.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
+                    
+                            elif node in layer_f.connections.keys():
+                                for item in layer_f.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
 
-            # Create a hidden layer that connects two portions
-            hidden = Layer(first.numN, second.numL,random.choice(act_list))
+                            else:
+                                for output in child_1.layers[-1].nodes:
+                                    layer.create_connection(node,output,np.random.uniform(-1,1))
 
-            # Append the layer to the end of the first portion
-            p1.append(hidden)
+            for layer in child_2.layers:
+                for node in layer.nodes:
+                    for layer_i in parent_1.layers:
+                        for layer_f in parent_2.layers:
+                            if node in layer_i.connections.keys():
+                                for item in layer_i.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
+                    
+                            elif node in layer_f.connections.keys():
+                                for item in layer_f.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
 
-            # Combine everything
-            child_1.layers = p1  + p2
-
-            # Extract first portion from parent 2 and second portion from parent 1
-            p1 = parent_2.layers[0:split_2]
-            p2 = parent_1.layers[split_1:len(parent_1.layers)]
-
-            # Check if the portions are empty
-            if len(p1) == 0 or len(p2) == 0:
-                continue
-
-            # If the first portion have more then one value then select the last one
-            # or else select the first one (which is the only one)
-            first = p1[0]
-            if len(p1) > 1:
-                first = p1[-1]
-
-            # Select the first value of portion 2
-            second = p2[0]
-
-            # Create a hidden layer that connects two portions
-            hidden = Layer(first.numN, second.numL,random.choice(act_list))
-
-            # Append the layer to the end of the first portion
-            p1.append(hidden)
-
-            # Combine everything
-            child_2.layers = p1 +  p2
-
+                            else:
+                                for output in child_2.layers[-1].nodes:
+                                    layer.create_connection(node,output,np.random.uniform(-1,1))
+                                
+            
             # Put the children in the list
             offspring.append(child_1)
             offspring.append(child_2)
@@ -144,19 +146,24 @@ class Genetic:
 
         # Iterate through each layer of each agent
         for agent in agents:
-            for layer in agent.layers:
+            num_layers = len(agent.layers)
+           
+            for layer in range(num_layers):
+                next_layers = agent.layers[layer + 1: num_layers]
+                if len(next_layers) == 0:
+                    continue
+                for node in agent.layers[layer].nodes:
+                    
+                    # Decides whether a mutation occurs or not
+                    if random.uniform(0.0, 1.0) <= self.mutation_rate:
 
-                # Decides whether a mutation occurs or not
-                if random.uniform(0.0, 1.0) <= self.mutation_rate:
+                        random_layer = random.choice(next_layers)
+                        random_node = random.choice(random_layer.nodes)
+                        agent.layers[layer].create_connection(node,random_node,np.random.uniform(-1,1))
 
-                    # Select random weights from the weight list
-                    mask = mask = np.random.randint(0,2,size=layer.weights.shape).astype(np.bool)
-
-                    # Generate random weights
-                    r = np.random.rand(*layer.weights.shape)*np.max(layer.weights)
-
-                    # Replace the selected weights
-                    layer.weights[mask] = r[mask]
+                    if random.uniform(0.0, 1.0) <= self.mutation_rate:
+                        agent.layers[layer].bias = np.random.uniform(-1,1)
+        
 
         return agents
 
@@ -167,14 +174,19 @@ class Genetic:
     def simulate(self, i, agent):
 
         # Generate 2 random numbers
-        num_1 = random.randint(0,100)
-        num_2 = random.randint(0,100)
+        num = random.randint(1,101)
 
-        # Multiply them
-        true = num_1 * num_2
+        true = -1
+        if 1 <= num <= 33:
+            true = 0
+        elif 34 <= num <= 66:
+            true = 1
+        elif 67 <= num <= 100:
+            true = 2
+        
 
         # Feed the two numbers through the network
-        guess = agent.predict([num_1, num_2])
+        guess = agent.predict([num])
 
         # Store both numbers
         # (Storing the true number may not be good for an algorithm like this)
@@ -188,6 +200,7 @@ class Genetic:
         # Rerun the processes for n generations
         for generation in range(self.generations):
             print("Generation " + str(generation))
+            
 
             # Run through the simulation process for each agent
             for agent in range(len(self.agents)):
@@ -195,18 +208,21 @@ class Genetic:
 
             # Run through all the processes
             self.agents = self.fitness(self.agents)
+            
             self.agents = self.selection(self.agents)
+            
             self.agents = self.crossover(self.agents)
+            
             self.agents = self.mutation(self.agents)
+            
+       
+            self.best_fit= max(self.agents, key=lambda x:x.fitness)
 
-            # Replace the existing best fit agent with a better one
-            if self.best_fit:
+        while(True):
+            x = int(input("Input X: "))
+            result = self.best_fit.predict([x])
+            print("Best fit thinks it is : {0}".format(result))
+        
 
-                # Instead of selecting a best one from each generation
-                # We select the best one from all generations
-                if max(self.agents, key=lambda x:x.fitness).fitness >= self.best_fit.fitness:
-                    self.best_fit = max(self.agents, key=lambda x:x.fitness)
-            else:
 
-                # Select the best one from the first generation
-                self.best_fit= max(self.agents, key=lambda x:x.fitness)
+                

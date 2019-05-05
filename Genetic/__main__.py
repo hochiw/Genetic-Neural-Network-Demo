@@ -4,16 +4,20 @@ def main():
 
     # All the required data for the genetic algorithm
     population = 100
-    generations = 100
-    selection_percentage = 0.1
-    mutation_rate = 0.2
-    inp = 2
-    output = 1
+    generations = 30
+    selection_percentage = 0.2
+    mutation_rate = 0.3
+    connection_chance = 0.5
+    max_layers = 20
+    max_nodes = 20
+    inp = 1
+    output = 3
+    # 1-33: 0 34-66: 1 67 - 100: 2
 
     # Initialize and run the genetic algorithm
-    GA = Genetic(population,generations,selection_percentage,mutation_rate,inp,output)
+    GA = Genetic(population,generations,selection_percentage,mutation_rate,connection_chance,max_layers,max_nodes,inp,output)
     GA.start()
-    GA.best_fit.getConfig()
+    
 
 
 if __name__ == '__main__':
