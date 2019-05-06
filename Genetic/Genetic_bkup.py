@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from Agent import Agent
-from Node import Node
+from Layer import Layer
 
 # The main genetic algorithm class
 class Genetic:
@@ -85,31 +85,53 @@ class Genetic:
             child_1 = Agent(self.inp, self.output, self.connection_chance,self.maxL, self.maxN, True)
             child_2 = Agent(self.inp, self.output, self.connection_chance,self.maxL, self.maxN, True)
 
+            split_1 = random.randint(1,len(parent_1.layers))
+            split_2 = random.randint(0,len(parent_2.layers) - 1)
 
-            split_1 = random.randint(0,len(parent_1.nodes))
-            split_2 = random.randint(0,len(parent_2.nodes))
+            child_1.layers = parent_1.layers[0:split_1] + parent_2.layers[split_2: len(parent_2.layers)]
 
-            for key in parent_1.nodes.keys():
-                if key <= split_1:
-                    child_1.nodes[key] = parent_1.nodes[key]
+            split_1 = random.randint(0, len(parent_1.layers) - 1)
+            split_2 = random.randint(1,len(parent_2.layers))
 
-            for key in parent_2.nodes.keys():
-                if split_2 >= key >= len(parent_2.nodes):
-                    child_1.nodes[key] = parent_2.nodes[key]
+            child_2.layers = parent_2.layers[0:split_2] + parent_1.layers[split_1:len(parent_1.layers)]
 
-            for key in parent_2.nodes.keys():
-                if key <= split_2:
-                    child_1.nodes[key] = parent_2.nodes[key]
+            # Attempt to reconnect the links
+            for layer in child_1.layers:
+                for node in layer.nodes:
+                    for layer_i in parent_1.layers:
+                        for layer_f in parent_2.layers:
+                            if node in layer_i.connections.keys():
+                                for item in layer_i.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
 
-            for key in parent_1.nodes.keys():
-                if split_1 >= key >= len(parent_1.nodes):
-                    child_1.nodes[key] = parent_1.nodes[key]
+                            elif node in layer_f.connections.keys():
+                                for item in layer_f.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
 
+                            else:
+                                for output in child_1.layers[-1].nodes:
+                                    layer.create_connection(node,output,np.random.uniform(-1,1))
 
-            self.extend_connections(child_1, parent_1)
-            self.extend_connections(child_1, parent_2)
-            self.extend_connections(child_2, parent_1)
-            self.extend_connections(child_2, parent_2)
+            for layer in child_2.layers:
+                for node in layer.nodes:
+                    for layer_i in parent_1.layers:
+                        for layer_f in parent_2.layers:
+                            if node in layer_i.connections.keys():
+                                for item in layer_i.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
+
+                            elif node in layer_f.connections.keys():
+                                for item in layer_f.connections[node]:
+                                    if item[0] in layer.nodes:
+                                        layer.create_connection(node,item[0],item[1])
+
+                            else:
+                                for output in child_2.layers[-1].nodes:
+                                    layer.create_connection(node,output,np.random.uniform(-1,1))
+
 
             # Put the children in the list
             offspring.append(child_1)
@@ -119,45 +141,28 @@ class Genetic:
         agents.extend(offspring)
         return agents
 
-    def extend_connections(self, child, parent):
-        for key in parent.connections.keys():
-            if key in child.nodes and key not in child.connections:
-                child.connections[key] = parent.connections[key]
-            elif key in child.nodes and key in child.connections:
-                if len(parent.connections[key]) == 1:
-                    child.connections[key].append(parent.connections[key])
-                else:
-                    child.connections[key] += parent.connections[key]
-
     # Function that handles random mutation of an agent
     def mutation(self, agents):
-        act_list = ['tanh','sigmoid','relu']
+
         # Iterate through each layer of each agent
         for agent in agents:
-            for item in agent.connections.keys():
-                if np.random.uniform(0,1) <= self.mutation_rate:
-                    offset = np.random.uniform(-0.5,0.5)
-                    agent.connections[item] = [(tp[0],tp[1] + offset) for tp in agent.connections[item]]
+            num_layers = len(agent.layers)
 
-            if np.random.uniform(0,1) <= self.mutation_rate:
-                layer = random.randint(1, self.maxL)
-                if layer not in agent.nodes.keys():
-                    agent.nodes[layer] = [Node(random.choice(act_list))]
-                else:
-                    agent.nodes[layer].append(Node(random.choice(act_list)))
+            for layer in range(num_layers):
+                next_layers = agent.layers[layer + 1: num_layers]
+                if len(next_layers) == 0:
+                    continue
+                for node in agent.layers[layer].nodes:
 
-                for nd in agent.nodes[layer]:
-                    for lay in agent.nodes.keys():
-                        for nd_i in agent.nodes[lay]:
-                            if np.random.uniform(0,1) <= self.mutation_rate:
-                                if lay < layer:
-                                    agent.create_connection(nd_i,nd,np.random.uniform(-1,1))
-                                else:
-                                    agent.create_connection(nd,nd_i,np.random.uniform(-1,1))
+                    # Decides whether a mutation occurs or not
+                    if random.uniform(0.0, 1.0) <= self.mutation_rate:
 
+                        random_layer = random.choice(next_layers)
+                        random_node = random.choice(random_layer.nodes)
+                        agent.layers[layer].create_connection(node,random_node,np.random.uniform(-1,1))
 
-
-
+                    if random.uniform(0.0, 1.0) <= self.mutation_rate:
+                        agent.layers[layer].bias = np.random.uniform(-1,1)
 
 
         return agents

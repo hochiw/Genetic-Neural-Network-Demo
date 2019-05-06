@@ -4,19 +4,18 @@ import numpy as np
 # Nodes in the neural network layer
 class Node:
 
-    def __init__(self, layer_num, activation=None):
-        self.value = 0
-        self.layer_num = layer_num
+    def __init__(self,  activation=None):
+        self.value = -1
         self.activation = self.activation_select(activation)
 
     def getValue(self):
         if self.activation:
             value = self.value
-            self.value = 0
+            self.value = -1
             return self.activation(value)
         else:
             value = self.value
-            self.value = 0
+            self.value = -1
             return self.value
 
     def feed(self, value):
@@ -35,7 +34,7 @@ class Node:
     def activation_select(self,type_i):
         if type_i == None:
             return None
-        
+
         if type_i == "tanh":
             return self.tanh
         if type_i == "sigmoid":
